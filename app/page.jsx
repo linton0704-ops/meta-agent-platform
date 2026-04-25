@@ -398,6 +398,8 @@ export default function Home() {
         )}
      {/* Pricing */}
 <div style={{ marginTop: 60, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+{/* Section Pricing toujours visible */}
+<div style={{ marginTop: 60, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
   <h2 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Choisir un plan</h2>
   <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', marginBottom: 32 }}>Commence gratuitement, upgrade quand tu es prêt</p>
   <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
@@ -417,9 +419,7 @@ export default function Home() {
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>/mois · {plan.agents}</div>
         <button
           onClick={() => handleCheckout(plan.key)}
-          style={{ width: '100%', padding: '12px 0', borderRadius: 12, cursor: 'pointer', background: plan.popular ? 'linear-gradient(135deg, #7c3aed, #db2777)' : 'rgba(255,255,255,0.08)', border: plan.popular ? 'none' : '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 14, fontWeight: 700, transition: 'all 0.2s' }}
-          onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-          onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          style={{ width: '100%', padding: '12px 0', borderRadius: 12, cursor: 'pointer', background: plan.popular ? 'linear-gradient(135deg, #7c3aed, #db2777)' : 'rgba(255,255,255,0.08)', border: plan.popular ? 'none' : '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 14, fontWeight: 700 }}
         >
           Commencer →
         </button>
@@ -427,8 +427,6 @@ export default function Home() {
     ))}
   </div>
 </div>
-{/* Section Pricing toujours visible */}
-<div style={{ marginTop: 60, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
  </main>
 
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '24px', textAlign: 'center', position: 'relative', zIndex: 1 }}>
