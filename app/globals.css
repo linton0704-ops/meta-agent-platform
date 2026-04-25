@@ -1,7 +1,37 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  background: #0a0a0f;
-  color: #e8e8f0;
-  font-family: 'DM Sans', system-ui, sans-serif;
-  min-height: 100vh;
+/* app/globals.css */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(7,7,17,0.8);
+  backdrop-filter: blur(30px);
+  padding: 0 24px;
+}
+
+.nav-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-generate {
+  padding: 14px 32px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-generate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
