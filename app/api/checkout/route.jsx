@@ -1,7 +1,4 @@
 import { NextResponse } from 'next/server'
-import Stripe from 'stripe'
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export async function POST(req) {
   try {
@@ -15,6 +12,14 @@ export async function POST(req) {
 
     const selected = prices[plan] || prices.starter
 
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+    if (!stripeSecretKey) {
+      return NextResponse.json({ error: 'Stripe non configuré' }, { status: 500 })
+    }
+
+    const Stripe = (await import('stripe')).default
+    const stripe = new Stripe(stripeSecretKey)
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'subscription',
@@ -27,12 +32,13 @@ export async function POST(req) {
         },
         quantity: 1,
       }],
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success`,
-      cancel_url:  `${process.env.NEXT_PUBLIC_BASE_URL}/`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/success`,
+      cancel_url:  `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/`,
     })
 
     return NextResponse.json({ url: session.url })
   } catch (e) {
+    console.error('Stripe error:', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
