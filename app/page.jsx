@@ -429,33 +429,6 @@ export default function Home() {
 </div>
 {/* Section Pricing toujours visible */}
 <div style={{ marginTop: 60, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
-  <h2 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Choisir un plan</h2>
-  <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', marginBottom: 32 }}>Commence gratuitement, upgrade quand tu es prêt</p>
-  <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
-    {[
-      { key: 'starter',  name: 'Starter',  price: '29€',  agents: '3 agents',  color: '#6366f1' },
-      { key: 'pro',      name: 'Pro',       price: '89€',  agents: '20 agents', color: '#7c3aed', popular: true },
-      { key: 'business', name: 'Business',  price: '299€', agents: 'Illimité',  color: '#db2777' },
-    ].map(plan => (
-      <div key={plan.key} style={{ borderRadius: 20, padding: 28, background: plan.popular ? 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(219,39,119,0.1))' : 'rgba(255,255,255,0.02)', border: `1px solid ${plan.popular ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`, position: 'relative', textAlign: 'center' }}>
-        {plan.popular && (
-          <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, #7c3aed, #db2777)', borderRadius: 20, padding: '4px 16px', fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
-            ⭐ POPULAIRE
-          </div>
-        )}
-        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{plan.name}</h3>
-        <div style={{ fontSize: 36, fontWeight: 800, marginBottom: 4, color: plan.color }}>{plan.price}</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>/mois · {plan.agents}</div>
-        <button
-          onClick={() => handleCheckout(plan.key)}
-          style={{ width: '100%', padding: '12px 0', borderRadius: 12, cursor: 'pointer', background: plan.popular ? 'linear-gradient(135deg, #7c3aed, #db2777)' : 'rgba(255,255,255,0.08)', border: plan.popular ? 'none' : '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 14, fontWeight: 700 }}
-        >
-          Commencer →
-        </button>
-      </div>
-    ))}
-  </div>
-</div>
  </main>
 
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '24px', textAlign: 'center', position: 'relative', zIndex: 1 }}>
