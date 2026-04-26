@@ -1,27 +1,21 @@
 import { NextResponse } from 'next/server'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { MongoClient } from 'mongodb'
 
-const DB_PATH = join(process.cwd(), 'agents_data.json')
+let client, db
 
-function readAgents() {
-  if (!existsSync(DB_PATH)) return []
-  try {
-    return JSON.parse(readFileSync(DB_PATH, 'utf-8'))
-  } catch {
-    return []
+async function getDb() {
+  if (!client) {
+    client = new MongoClient(process.env.MONGO_URL)
+    await client.connect()
+    db = client.db('metaagent_db')
   }
-}
-
-function writeAgents(agents) {
-  writeFileSync(DB_PATH, JSON.stringify(agents, null, 2), 'utf-8')
+  return db
 }
 
 export async function DELETE(request, { params }) {
   try {
-    const agents = readAgents()
-    const filtered = agents.filter(a => a.id !== params.id)
-    writeAgents(filtered)
+    const database = await getDb()
+    await database.collection('agents').deleteOne({ id: params.id })
     return NextResponse.json({ ok: true })
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 })
