@@ -398,8 +398,6 @@ export default function Home() {
         )}
      {/* Pricing */}
 <div style={{ marginTop: 60, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
-{/* Section Pricing toujours visible */}
-<div style={{ marginTop: 60, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
   <h2 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Choisir un plan</h2>
   <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', marginBottom: 32 }}>Commence gratuitement, upgrade quand tu es prêt</p>
   <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
