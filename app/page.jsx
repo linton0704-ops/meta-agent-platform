@@ -185,6 +185,13 @@ export default function Home() {
   const [agents, setAgents] = useState([])
   const [tab, setTab] = useState('create')
   const [charCount, setCharCount] = useState(0)
+  const [freeUsed, setFreeUsed] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return parseInt(localStorage.getItem('free_generations') || '0')
+  }
+  return 0
+})
+const FREE_LIMIT = 2
   const resultRef = useRef(null)
 
   useEffect(() => { loadAgents() }, [])
@@ -212,12 +219,26 @@ export default function Home() {
 
   async function handleGenerate() {
     if (intent.trim().length < 10) { toast.error('Décris ton agent en au moins 10 caractères.'); return }
+
+if (freeUsed >= FREE_LIMIT) {
+  toast.error('Limite gratuite atteinte ! Abonnez-vous pour continuer.')
+  document.getElementById('pricing-section').scrollIntoView({ behavior: 'smooth' })
+  return
+}
     setLoading(true); setError(null); setResult(null)
     try {
       const r = await fetch('/api/agents/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_intent: intent }) })
       const d = await r.json()
       if (!r.ok || d.error) { setError(d); toast.error(d.reason || d.error) }
-      else { setResult(d); toast.success('Agent généré !'); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth' }), 100) }
+      else { setResult(d)
+const newCount = freeUsed + 1
+setFreeUsed(newCount)
+localStorage.setItem('free_generations', newCount.toString())
+if (newCount >= FREE_LIMIT) {
+  toast.success(`Agent généré ! Il vous reste 0 génération gratuite.`)
+} else {
+  toast.success(`Agent généré ! Il vous reste ${FREE_LIMIT - newCount} génération gratuite.`)
+}setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth' }), 100) }
     } catch { setError({ error: 'RÉSEAU', reason: 'Impossible de contacter le serveur.' }); toast.error('Erreur réseau.') }
     finally { setLoading(false) }
   }
@@ -397,7 +418,7 @@ export default function Home() {
           </div>
         )}
      {/* Pricing */}
-<div style={{ marginTop: 60, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+<div id="pricing-section" style={{ marginTop: 60, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
   <h2 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Choisir un plan</h2>
   <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', marginBottom: 32 }}>Commence gratuitement, upgrade quand tu es prêt</p>
   <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
