@@ -2,11 +2,67 @@
 import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
-const EXEMPLES = [
-  "🍕 Restaurant : Un agent qui répond automatiquement aux réservations reçues par email et les confirme",
-  "🛍️ E-commerce : Un agent qui répond aux questions clients sur les commandes et gère les remboursements",
-  "📱 Agence : Un agent qui surveille les mentions de ma marque et génère un rapport quotidien",
-  "💼 Freelance : Un agent qui trie mes emails clients par urgence et rédige des réponses automatiques",
+const BUSINESS_TEMPLATES = [
+  {
+    title: 'Agent Restaurant',
+    icon: '🍕',
+    description: 'Réservations, menus & avis clients automatisés',
+    preset: "Je veux un agent pour mon restaurant qui répond automatiquement aux emails de réservation, confirme les tables disponibles dans mon agenda, envoie des rappels aux clients la veille et gère les annulations. Il doit aussi répondre aux questions fréquentes sur le menu et les horaires d'ouverture.",
+  },
+  {
+    title: 'Agent Immobilier',
+    icon: '🏠',
+    description: 'Qualifie les prospects et planifie les visites',
+    preset: "Je veux un agent pour mon agence immobilière qui répond aux demandes d'information sur les biens, qualifie automatiquement les prospects (budget, projet, délai), planifie les visites dans mon calendrier et envoie des alertes pour les nouveaux biens correspondant à leurs critères.",
+  },
+  {
+    title: 'Agent Coiffeur',
+    icon: '✂️',
+    description: 'Réservations de créneaux et rappels clients',
+    preset: "Je veux un agent pour mon salon de coiffure qui gère les prises de rendez-vous par SMS et email, envoie des rappels automatiques 24h avant, propose des créneaux disponibles et relance les clients qui n'ont pas repris rendez-vous depuis 2 mois.",
+  },
+  {
+    title: 'Agent Freelance',
+    icon: '💼',
+    description: 'Emails clients, devis et relances automatiques',
+    preset: "Je veux un agent freelance qui trie mes emails par urgence (client bloqué, nouveau projet, facturation), rédige des réponses professionnelles en mon nom, génère des devis à partir de mes tarifs et relance automatiquement les factures impayées.",
+  },
+  {
+    title: 'Agent E-commerce',
+    icon: '🛍️',
+    description: 'SAV, remboursements et suivi commandes',
+    preset: "Je veux un agent e-commerce qui répond aux questions clients sur les commandes, gère les demandes de remboursement et retour, envoie des mises à jour de livraison proactives et détecte les avis négatifs pour les traiter en priorité.",
+  },
+  {
+    title: 'Agent RH',
+    icon: '👥',
+    description: 'Tri des CV et gestion des candidatures',
+    preset: "Je veux un agent RH qui analyse les CVs reçus par email, les score selon mes critères (expérience, compétences, localisation), envoie des accusés de réception personnalisés, planifie les entretiens et notifie les candidats non retenus.",
+  },
+  {
+    title: 'Agent Avocat',
+    icon: '⚖️',
+    description: 'Premier contact clients et qualification dossiers',
+    preset: "Je veux un agent pour mon cabinet d'avocats qui répond aux premières demandes de contact, qualifie le type de dossier (divorce, droit du travail, immobilier), collecte les informations essentielles, fixe des rendez-vous de consultation et envoie des questionnaires préparatoires.",
+  },
+  {
+    title: 'Agent Salle de Sport',
+    icon: '🏋️',
+    description: 'Abonnements, cours et suivi des membres',
+    preset: "Je veux un agent pour ma salle de sport qui gère les inscriptions aux cours collectifs, envoie des rappels de séances, relance les membres inactifs depuis plus de 2 semaines, répond aux questions sur les horaires et abonnements et collecte les feedbacks après les sessions.",
+  },
+  {
+    title: 'Agent Coach',
+    icon: '🎯',
+    description: 'Séances, exercices et rapports de progression',
+    preset: "Je veux un agent pour mon activité de coaching qui planifie les séances avec mes clients, envoie des exercices et contenus personnalisés entre les sessions, collecte leurs progrès et humeur chaque semaine et génère des rapports de progression mensuels.",
+  },
+  {
+    title: 'Agent Artisan',
+    icon: '🔨',
+    description: 'Devis, planning chantiers et suivi facturation',
+    preset: "Je veux un agent pour mon activité artisanale qui répond aux demandes de devis par email, planifie les visites de chantier dans mon agenda, envoie des mises à jour d'avancement aux clients, génère des factures et relance les paiements en retard.",
+  },
 ]
 
 const TYPE_COLORS = {
@@ -71,10 +127,223 @@ function StatBadge({ label, value, color }) {
   )
 }
 
+// ─── Log colors ─────────────────────────────────────────────────────────────
+const LOG_COLORS = {
+  llm:     '#c4b5fd',
+  tool:    '#7dd3fc',
+  success: '#6ee7b7',
+  warning: '#fcd34d',
+  error:   '#fca5a5',
+  info:    'rgba(255,255,255,0.55)',
+}
+
+function AgentRunner({ agent, onClose }) {
+  const [prompt,      setPrompt]      = useState('')
+  const [logs,        setLogs]        = useState([])
+  const [running,     setRunning]     = useState(false)
+  const [finalAnswer, setFinalAnswer] = useState(null)
+  const [runError,    setRunError]    = useState(null)
+  const [currentStep, setCurrentStep] = useState(0)
+  const logsEndRef = useRef(null)
+  const totalSteps = agent?.nodes?.length || 1
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs])
+
+  async function handleRun() {
+    if (!prompt.trim() || running) return
+    setRunning(true)
+    setLogs([])
+    setFinalAnswer(null)
+    setRunError(null)
+    setCurrentStep(0)
+
+    try {
+      const res = await fetch('/api/agents/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent, prompt: prompt.trim() }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Erreur serveur ${res.status}`)
+      }
+
+      const reader = res.body.getReader()
+      const dec    = new TextDecoder()
+      let   buf    = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        const parts = buf.split('\n')
+        buf = parts.pop()
+        for (const line of parts) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const ev = JSON.parse(line.slice(6))
+            if (ev.type === 'step')  setCurrentStep(ev.step)
+            if (ev.type === 'done')  { setFinalAnswer(ev.finalAnswer); setCurrentStep(totalSteps) }
+            if (ev.type === 'error') setRunError(ev.message)
+            else setLogs(p => [...p, ev])
+          } catch {}
+        }
+      }
+    } catch (e) {
+      setRunError(e.message)
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  function renderLogEntry(ev, i) {
+    if (ev.type === 'start') return (
+      <div key={i} style={{ color: '#a78bfa', paddingBottom: 10, marginBottom: 6, borderBottom: '1px solid rgba(139,92,246,0.15)' }}>
+        ━━ Agent «{ev.agentName}» · {ev.nodeCount} nœud{ev.nodeCount > 1 ? 's' : ''} ━━
+      </div>
+    )
+    if (ev.type === 'step') return (
+      <div key={i} style={{ color: '#67e8f9', marginTop: 12, marginBottom: 4, paddingTop: 10, borderTop: '1px solid rgba(103,232,249,0.1)' }}>
+        ┌ Étape {ev.step}/{ev.total} · <span style={{ fontWeight: 700 }}>{ev.nodeId}</span>
+        <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 8 }}>[{ev.nodeType}]</span>
+      </div>
+    )
+    if (ev.type === 'log') return (
+      <div key={i} style={{ color: LOG_COLORS[ev.level] || LOG_COLORS.info, paddingLeft: 14, padding: '2px 0 2px 14px', lineHeight: 1.6 }}>
+        {ev.message}
+      </div>
+    )
+    if (ev.type === 'llm_response') return (
+      <div key={i} style={{ margin: '8px 0', padding: '10px 14px', borderRadius: 10, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
+        <span style={{ display: 'block', color: '#a78bfa', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>◈ {ev.nodeId}</span>
+        <span style={{ color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
+          {ev.response.length > 320 ? ev.response.slice(0, 320) + '…' : ev.response}
+        </span>
+      </div>
+    )
+    if (ev.type === 'tool_result') return (
+      <div key={i} style={{ margin: '8px 0', padding: '10px 14px', borderRadius: 10, background: 'rgba(14,165,233,0.07)', border: '1px solid rgba(14,165,233,0.18)' }}>
+        <span style={{ display: 'block', color: '#7dd3fc', marginBottom: 6 }}>{ev.emoji} {ev.tool} → réponse reçue</span>
+        <pre style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, overflow: 'hidden', maxHeight: 56, margin: 0 }}>
+          {JSON.stringify(ev.result, null, 2).slice(0, 220)}
+        </pre>
+      </div>
+    )
+    if (ev.type === 'done') return (
+      <div key={i} style={{ color: '#34d399', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(52,211,153,0.15)' }}>
+        ✓ Exécution terminée en {ev.duration}s
+      </div>
+    )
+    return null
+  }
+
+  const progressPct = totalSteps > 0 ? Math.min(100, (currentStep / totalSteps) * 100) : 0
+
+  return (
+    <div style={{ marginTop: 24, borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', animation: 'fadeInUp 0.4s ease' }}>
+
+      {/* ── Terminal chrome header ── */}
+      <div style={{ padding: '14px 20px', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 7 }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f57' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#febc2e' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#28c840' }} />
+          </div>
+          <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+            meta-agent-runner — <span style={{ color: 'rgba(255,255,255,0.7)' }}>{agent.name}</span>
+          </span>
+        </div>
+        <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.2)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+        >×</button>
+      </div>
+
+      {/* ── Input area ── */}
+      <div style={{ padding: '20px 20px 16px', background: 'rgba(0,0,0,0.45)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
+          Requête de test
+        </label>
+        <textarea
+          value={prompt}
+          onChange={e => setPrompt(e.target.value)}
+          disabled={running}
+          rows={3}
+          placeholder={`Ex : "Voici un email client : 'Bonjour, je souhaite réserver une table pour 4 personnes samedi soir à 20h…'"`}
+          style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.07)', color: '#fff', fontSize: 13, lineHeight: 1.65, resize: 'vertical', fontFamily: 'inherit', transition: 'border-color 0.2s' }}
+          onFocus={e => e.target.style.borderColor = 'rgba(139,92,246,0.5)'}
+          onBlur={e => e.target.style.borderColor  = 'rgba(255,255,255,0.07)'}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleRun() }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>Ctrl+Entrée pour lancer</span>
+          <button onClick={handleRun} disabled={running || !prompt.trim()}
+            style={{ padding: '10px 24px', borderRadius: 12, cursor: running || !prompt.trim() ? 'not-allowed' : 'pointer', background: running || !prompt.trim() ? 'rgba(124,58,237,0.2)' : 'linear-gradient(135deg, #7c3aed, #0891b2)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, opacity: !prompt.trim() ? 0.5 : 1, transition: 'all 0.2s' }}
+            onMouseEnter={e => { if (!running && prompt.trim()) e.currentTarget.style.transform = 'translateY(-1px)' }}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            {running
+              ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} /> Exécution en cours…</>
+              : <><span>▶</span> Lancer l'exécution</>
+            }
+          </button>
+        </div>
+      </div>
+
+      {/* ── Progress bar ── */}
+      {(running || logs.length > 0) && (
+        <div style={{ height: 3, background: 'rgba(255,255,255,0.04)' }}>
+          <div style={{ height: '100%', width: `${progressPct}%`, background: 'linear-gradient(90deg, #7c3aed, #0891b2)', transition: 'width 0.6s ease', boxShadow: '0 0 8px rgba(124,58,237,0.6)' }} />
+        </div>
+      )}
+
+      {/* ── Terminal log output ── */}
+      {logs.length > 0 && (
+        <div style={{ padding: '18px 20px', background: 'rgba(0,0,0,0.55)', maxHeight: 420, overflowY: 'auto', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.7 }}>
+          {logs.map((ev, i) => renderLogEntry(ev, i))}
+          {running && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.25)', marginTop: 6 }}>
+              <span style={{ animation: 'blink 1s step-end infinite', fontSize: 16 }}>▋</span>
+            </div>
+          )}
+          <div ref={logsEndRef} />
+        </div>
+      )}
+
+      {/* ── Error ── */}
+      {runError && !running && (
+        <div style={{ padding: '14px 20px', background: 'rgba(239,68,68,0.07)', borderTop: '1px solid rgba(239,68,68,0.2)', fontFamily: 'monospace', fontSize: 12, color: '#fca5a5' }}>
+          ⚠ Erreur : {runError}
+        </div>
+      )}
+
+      {/* ── Final answer ── */}
+      {finalAnswer && !running && (
+        <div style={{ padding: '20px', borderTop: '1px solid rgba(52,211,153,0.2)', background: 'rgba(52,211,153,0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
+            <span style={{ fontSize: 11, color: '#34d399', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600 }}>Réponse finale de l'agent</span>
+          </div>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.82)', lineHeight: 1.75, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{finalAnswer}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AgentResult({ config, onSave, onCopy }) {
   const safety = SAFETY_COLORS[config.safety_level] || SAFETY_COLORS.medium
-  const [saved, setSaved] = useState(false)
+  const [saved,       setSaved]       = useState(false)
+  const [showRunner,  setShowRunner]  = useState(false)
+  const runnerRef = useRef(null)
   const handleSave = async () => { await onSave(); setSaved(true) }
+  const handleOpenRunner = () => {
+    setShowRunner(true)
+    setTimeout(() => runnerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+  }
   return (
     <div style={{ marginTop: 24, animation: 'fadeInUp 0.5s ease' }}>
       <div style={{ borderRadius: 20, padding: 28, marginBottom: 16, background: 'linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(219,39,119,0.08) 50%, rgba(14,165,233,0.08) 100%)', border: '1px solid rgba(139,92,246,0.25)', backdropFilter: 'blur(20px)' }}>
@@ -120,11 +389,30 @@ function AgentResult({ config, onSave, onCopy }) {
         <button onClick={onCopy} style={{ flex: 1, minWidth: 140, padding: '14px 20px', borderRadius: 14, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: 500, transition: 'all 0.2s' }}
           onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
           onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-        >📋 Copier le JSON</button>
+        >📋 Copier le JSON</button><button onClick={handleDeploy} style={{
+  width: '100%', padding: '14px 20px', borderRadius: 14,
+  cursor: 'pointer', marginTop: 8,
+  background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+  border: 'none', color: '#fff', fontSize: 14, fontWeight: 700,
+  transition: 'all 0.2s'
+}}
+  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+>
+  🚀 Déployer l'agent (le rendre vivant)
+</button>
         <button onClick={handleSave} style={{ flex: 2, minWidth: 200, padding: '14px 20px', borderRadius: 14, cursor: 'pointer', background: saved ? 'linear-gradient(135deg, #059669, #0d9488)' : 'linear-gradient(135deg, #7c3aed, #db2777)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, transition: 'all 0.3s', boxShadow: saved ? '0 4px 20px rgba(5,150,105,0.4)' : '0 4px 20px rgba(124,58,237,0.4)' }}
           onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
           onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
         >{saved ? '✅ Agent sauvegardé !' : '💾 Sauvegarder l\'agent'}</button>
+        <button onClick={handleOpenRunner} style={{ flex: 1, minWidth: 160, padding: '14px 20px', borderRadius: 14, cursor: 'pointer', background: showRunner ? 'rgba(8,145,178,0.2)' : 'rgba(8,145,178,0.08)', border: `1px solid ${showRunner ? 'rgba(8,145,178,0.5)' : 'rgba(8,145,178,0.25)'}`, color: '#67e8f9', fontSize: 14, fontWeight: 700, transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(8,145,178,0.18)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = showRunner ? 'rgba(8,145,178,0.2)' : 'rgba(8,145,178,0.08)'; e.currentTarget.style.transform = 'translateY(0)' }}
+        ><span>▶</span> Tester l'agent</button>
+      </div>
+
+      <div ref={runnerRef}>
+        {showRunner && <AgentRunner agent={config} onClose={() => setShowRunner(false)} />}
       </div>
     </div>
   )
@@ -180,6 +468,7 @@ export default function Home() {
   })
   const FREE_LIMIT = 2
   const resultRef = useRef(null)
+  const textareaRef = useRef(null)
 
   useEffect(() => { loadAgents() }, [])
   useEffect(() => { setCharCount(intent.length) }, [intent])
@@ -191,7 +480,27 @@ export default function Home() {
       if (Array.isArray(d)) setAgents(d)
     } catch {}
   }
-
+async function handleDeploy() {
+  if (!result) return
+  try {
+    toast.loading('Déploiement en cours...')
+    const r = await fetch('/api/agents/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: result })
+    })
+    const d = await r.json()
+    toast.dismiss()
+    if (d.success) {
+      toast.success('🚀 Agent déployé ! Il tourne maintenant 24h/24')
+      window.open(d.workflow_url, '_blank')
+    } else {
+      toast.error('Erreur : ' + d.error)
+    }
+  } catch {
+    toast.error('Erreur réseau')
+  }
+}
   async function handleCheckout(plan) {
     try {
       const r = await fetch('/api/checkout', {
@@ -253,12 +562,12 @@ export default function Home() {
   return (
     <div style={{ minHeight: '100vh', background: '#070711', color: '#fff', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
         @keyframes fadeInUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
         @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.95)} }
         @keyframes spin { to { transform:rotate(360deg) } }
         @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
         @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
         * { box-sizing:border-box; margin:0; padding:0 }
         ::-webkit-scrollbar { width:4px } ::-webkit-scrollbar-track { background:transparent } ::-webkit-scrollbar-thumb { background:rgba(139,92,246,0.3); border-radius:2px }
         textarea:focus { outline:none !important }
@@ -270,7 +579,7 @@ export default function Home() {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
       </div>
 
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(7,7,17,0.8)', backdropFilter: 'blur(30px)', padding: '0 24px' }}>
+      <nav aria-label="Navigation principale" style={{ position: 'sticky', top: 0, zIndex: 100, borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(7,7,17,0.8)', backdropFilter: 'blur(30px)', padding: '0 24px' }}>
         <div style={{ maxWidth: 960, margin: '0 auto', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(135deg, #7c3aed, #db2777)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>🤖</div>
@@ -294,26 +603,26 @@ export default function Home() {
       <main style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px 80px', position: 'relative', zIndex: 1 }}>
 
         {/* Hero */}
-        <div style={{ textAlign: 'center', marginBottom: 56, animation: 'fadeInUp 0.6s ease' }}>
+        <section aria-label="Présentation de MetaAgent" style={{ textAlign: 'center', marginBottom: 56, animation: 'fadeInUp 0.6s ease' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 20, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', marginBottom: 28 }}>
             <span style={{ fontSize: 12 }}>✦</span>
-            <span style={{ fontSize: 12, color: 'rgba(196,181,253,0.9)', fontWeight: 500 }}>Génération d'agents IA · LangGraph · Claude Sonnet 4.5</span>
+            <span style={{ fontSize: 12, color: 'rgba(196,181,253,0.9)', fontWeight: 500 }}>Créez votre Agent IA · LangGraph · Claude Sonnet 4.5</span>
           </div>
           <h1 style={{ fontSize: 'clamp(36px, 6vw, 64px)', fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, marginBottom: 20 }}>
-            <span style={{ display: 'block', color: '#fff' }}>Automatise tes tâches.</span>
+            <span style={{ display: 'block', color: '#fff' }}>Créez votre Agent IA sur-mesure.</span>
             <span style={{ display: 'block', background: 'linear-gradient(135deg, #a78bfa 0%, #f472b6 50%, #67e8f9 100%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 4s linear infinite' }}>Sans coder. En 30 secondes.</span>
           </h1>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.4)', maxWidth: 520, margin: '0 auto', lineHeight: 1.8 }}>
-            Décris ce que tu veux automatiser → notre IA construit l'agent pour toi.
+            Décris ce que tu veux automatiser — notre IA construit l'agent pour ta PME.
             <br/>
-            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.25)' }}>Restaurants, e-commerce, agences, freelances — pour tous les métiers.</span>
+            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.25)' }}>Restaurant, e-commerce, immobilier, RH — automatisation pour toutes les PME françaises.</span>
           </p>
           {freeUsed < FREE_LIMIT && (
             <div style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 16px', borderRadius: 20, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
               <span style={{ fontSize: 12, color: '#34d399' }}>✅ {FREE_LIMIT - freeUsed} essai{FREE_LIMIT - freeUsed > 1 ? 's' : ''} gratuit{FREE_LIMIT - freeUsed > 1 ? 's' : ''} disponible{FREE_LIMIT - freeUsed > 1 ? 's' : ''}</span>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 4, padding: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, marginBottom: 32 }}>
@@ -326,12 +635,53 @@ export default function Home() {
 
         {tab === 'create' && (
           <div style={{ animation: 'fadeInUp 0.4s ease' }}>
+
+            {/* Templates Métiers */}
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(219,39,119,0.3))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>⚡</div>
+                <div>
+                  <h2 style={{ fontSize: 17, fontWeight: 700, color: '#fff' }}>Templates Métiers</h2>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Clique sur un template pour démarrer instantanément</p>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                {BUSINESS_TEMPLATES.map((tpl, i) => (
+                  <button
+                    key={i}
+                    disabled={loading}
+                    onClick={() => {
+                      setIntent(tpl.preset)
+                      setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+                    }}
+                    style={{ padding: '18px 16px', borderRadius: 16, cursor: loading ? 'not-allowed' : 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', textAlign: 'left', transition: 'all 0.22s', opacity: loading ? 0.5 : 1 }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(124,58,237,0.12)'
+                      e.currentTarget.style.borderColor = 'rgba(139,92,246,0.45)'
+                      e.currentTarget.style.boxShadow = '0 0 24px rgba(139,92,246,0.18), inset 0 0 0 1px rgba(139,92,246,0.1)'
+                      e.currentTarget.style.transform = 'translateY(-3px)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                      e.currentTarget.style.boxShadow = 'none'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                    }}
+                  >
+                    <div style={{ fontSize: 28, marginBottom: 10, lineHeight: 1 }}>{tpl.icon}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 6 }}>{tpl.title}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>{tpl.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div style={{ borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(20px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(219,39,119,0.3))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>💬</div>
                 <h2 style={{ fontSize: 17, fontWeight: 700 }}>Décris ton agent</h2>
               </div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative' }} ref={textareaRef}>
                 <textarea
                   value={intent}
                   onChange={e => setIntent(e.target.value)}
@@ -343,15 +693,6 @@ export default function Home() {
                   onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
                 />
                 <span style={{ position: 'absolute', bottom: 12, right: 14, fontSize: 11, color: charCount > 5500 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>{charCount}/6000</span>
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '16px 0 24px' }}>
-                {EXEMPLES.map((ex, i) => (
-                  <button key={i} onClick={() => setIntent(ex)} disabled={loading} style={{ padding: '7px 14px', borderRadius: 20, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', fontSize: 12, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.1)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)'; e.currentTarget.style.color = '#c4b5fd' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}
-                  >{ex.substring(0, 50)}…</button>
-                ))}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -410,7 +751,7 @@ export default function Home() {
         )}
 
         {/* FAQ */}
-        <div style={{ marginTop: 48, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <section aria-label="Questions fréquentes sur MetaAgent" style={{ marginTop: 48, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <h2 style={{ textAlign: 'center', fontSize: 24, fontWeight: 800, marginBottom: 32 }}>Questions fréquentes</h2>
           {[
             { q: "Puis-je annuler à tout moment ?", a: "Oui, sans engagement. Tu annules en 1 clic depuis ton espace client. Aucun frais caché." },
@@ -424,10 +765,10 @@ export default function Home() {
               <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7 }}>✅ {item.a}</div>
             </div>
           ))}
-        </div>
+        </section>
 
         {/* Pricing */}
-        <div id="pricing-section" style={{ marginTop: 48, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <section id="pricing-section" style={{ marginTop: 48, borderRadius: 24, padding: 32, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <h2 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Choisir un plan</h2>
           <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', marginBottom: 32 }}>Sans engagement · Annulation en 1 clic · Remboursé sous 14 jours si insatisfait</p>
           <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
@@ -457,7 +798,7 @@ export default function Home() {
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
       </main>
 
