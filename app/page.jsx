@@ -467,10 +467,16 @@ export default function Home() {
     return 0
   })
   const FREE_LIMIT = 2
+const [isOwner, setIsOwner] = useState(false)
+const [showOwnerLogin, setShowOwnerLogin] = useState(false)
+const [ownerPassword, setOwnerPassword] = useState('')
   const resultRef = useRef(null)
   const textareaRef = useRef(null)
 
-  useEffect(() => { loadAgents() }, [])
+  useEffect(() => {
+  loadAgents()
+  if (localStorage.getItem('is_owner') === 'true') setIsOwner(true)
+}, [])
   useEffect(() => { setCharCount(intent.length) }, [intent])
 
   async function loadAgents() {
@@ -501,6 +507,26 @@ async function handleDeploy() {
     toast.error('Erreur réseau')
   }
 }
+async function handleOwnerLogin() {
+  try {
+    const r = await fetch('/api/owner-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: ownerPassword })
+    })
+    const d = await r.json()
+    if (d.success) {
+      setIsOwner(true)
+      setShowOwnerLogin(false)
+      toast.success('Mode patron activé ! Générations illimitées ✅')
+      localStorage.setItem('is_owner', 'true')
+    } else {
+      toast.error('Mot de passe incorrect.')
+    }
+  } catch {
+    toast.error('Erreur réseau.')
+  }
+}
   async function handleCheckout(plan) {
     try {
       const r = await fetch('/api/checkout', {
@@ -517,7 +543,7 @@ async function handleDeploy() {
   async function handleGenerate() {
     if (intent.trim().length < 10) { toast.error('Décris ton agent en au moins 10 caractères.'); return }
 
-    if (freeUsed >= FREE_LIMIT) {
+    if (!isOwner && freeUsed >= FREE_LIMIT) {
       toast.error('Limite gratuite atteinte ! Abonnez-vous pour continuer.')
       document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth' })
       return
@@ -595,7 +621,47 @@ async function handleDeploy() {
             </div>
             <div style={{ padding: '6px 14px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
               {agents.length} agent{agents.length > 1 ? 's' : ''}
-            </div>
+            </div><button onClick={() => isOwner ? (setIsOwner(false), localStorage.removeItem('is_owner'), toast.success('Mode patron désactivé')) : setShowOwnerLogin(!showOwnerLogin)} style={{
+  padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
+  background: isOwner ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.04)',
+  border: isOwner ? '1px solid rgba(52,211,153,0.4)' : '1px solid rgba(255,255,255,0.08)',
+  color: isOwner ? '#34d399' : 'rgba(255,255,255,0.5)', fontSize: 12,
+}}>
+  {isOwner ? '👑 Patron' : '🔐 Patron'}
+</button>
+
+{showOwnerLogin && !isOwner && (
+  <div style={{
+    position: 'absolute', top: 70, right: 24, zIndex: 200,
+    background: '#0f0f1a', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 16, padding: 20, width: 280,
+    boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+  }}>
+    <p style={{ fontSize: 14, marginBottom: 12, color: 'rgba(255,255,255,0.7)' }}>
+      🔐 Connexion Patron
+    </p>
+    <input
+      type="password"
+      value={ownerPassword}
+      onChange={e => setOwnerPassword(e.target.value)}
+      onKeyDown={e => e.key === 'Enter' && handleOwnerLogin()}
+      placeholder="Mot de passe secret"
+      style={{
+        width: '100%', padding: '10px 14px', borderRadius: 10,
+        background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+        color: '#fff', fontSize: 14, marginBottom: 10,
+        outline: 'none', fontFamily: 'inherit'
+      }}
+    />
+    <button onClick={handleOwnerLogin} style={{
+      width: '100%', padding: '10px 0', borderRadius: 10,
+      background: 'linear-gradient(135deg, #7c3aed, #db2777)',
+      border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer'
+    }}>
+      Connexion
+    </button>
+  </div>
+)}
           </div>
         </div>
       </nav>
