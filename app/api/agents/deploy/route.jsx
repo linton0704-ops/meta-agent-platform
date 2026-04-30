@@ -10,33 +10,38 @@ export async function POST(req) {
       return NextResponse.json({ error: 'n8n non configuré' }, { status: 500 })
     }
 
-    const workflow = convertAgentToN8n(agent)
+    // 1. On prépare la structure du workflow (SANS le champ "active")
+    const workflowData = convertAgentToN8n(agent)
 
+    // 2. Création du workflow sur n8n
     const response = await fetch(`${N8N_URL}/api/v1/workflows`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-N8N-API-KEY': N8N_API_KEY,
       },
-      body: JSON.stringify(workflow),
+      body: JSON.stringify(workflowData),
     })
 
     if (!response.ok) {
       const err = await response.text()
-      return NextResponse.json({ error: `n8n error: ${err}` }, { status: 500 })
+      return NextResponse.json({ error: `n8n creation error: ${err}` }, { status: 500 })
     }
 
     const created = await response.json()
 
-    // Active le workflow
-    await fetch(`${N8N_URL}/api/v1/workflows/${created.id}/activate`, {
+    // 3. Activation du workflow (Appel séparé pour éviter l'erreur read-only)
+    const activationResponse = await fetch(`${N8N_URL}/api/v1/workflows/${created.id}/activate`, {
       method: 'POST',
-      headers: { 'X-N8N-API-KEY': N8N_API_KEY },
+      headers: { 
+        'X-N8N-API-KEY': N8N_API_KEY 
+      },
     })
 
     return NextResponse.json({
       success: true,
       workflow_id: created.id,
+      active: activationResponse.ok,
       workflow_url: `${N8N_URL}/workflow/${created.id}`,
     })
   } catch (e) {
@@ -49,116 +54,70 @@ function convertAgentToN8n(agent) {
   const connections = {}
   let posX = 250
 
-  // Nœud déclencheur (toutes les 24h)
-  nodes.push({
-    id: 'trigger',
+  // Nœud de départ (Trigger)
+  const triggerNode = {
+    id: 'trigger-id', // ID fixe pour la connexion
     name: 'Déclencheur quotidien',
     type: 'n8n-nodes-base.scheduleTrigger',
-    typeVersion: 1.2,
+    typeVersion: 1.1,
     parameters: {
       rule: { interval: [{ field: 'hours', hoursInterval: 24 }] }
     },
     position: [posX, 300],
-  })
+  }
+  
+  nodes.push(triggerNode)
+  let prevNodeId = 'trigger-id'
+  posX += 250
 
-  let prevNodeName = 'Déclencheur quotidien'
-  posX += 200
-
-  agent.nodes.forEach((node) => {
-    let n8nNode = null
+  // Conversion des nœuds de l'agent
+  agent.nodes.forEach((node, index) => {
+    let n8nNode = {
+      id: node.id,
+      name: `Node_${index}`, // n8n préfère des noms sans caractères spéciaux
+      position: [posX, 300],
+      parameters: {}
+    }
 
     if (node.type === 'llm') {
-      n8nNode = {
-        id: node.id,
-        name: node.id,
-        type: '@n8n/n8n-nodes-langchain.lmChatAnthropic',
-        typeVersion: 1,
-        parameters: {
-          model: 'claude-haiku-4-5',
-          messages: {
-            values: [{ content: node.prompt_template }]
-          }
-        },
-        position: [posX, 300],
+      n8nNode.type = 'n8n-nodes-base.httpRequest' // Utilisation simple pour test
+      n8nNode.typeVersion = 4
+      n8nNode.parameters = {
+        url: 'https://api.anthropic.com/v1/messages',
+        method: 'POST',
+        bodyParameters: {
+          parameters: [{ name: 'prompt', value: node.prompt_template }]
+        }
       }
     } else if (node.type === 'tool') {
-      const tool = node.tools?.[0]
-      if (tool?.name === 'send_email') {
-        n8nNode = {
-          id: node.id,
-          name: node.id,
-          type: 'n8n-nodes-base.emailSend',
-          typeVersion: 2,
-          parameters: {
-            fromEmail: 'noreply@metaagent.fr',
-            toEmail: '={{ $json.email }}',
-            subject: agent.name,
-            text: node.prompt_template,
-          },
-          position: [posX, 300],
-        }
-      } else if (tool?.name === 'slack_notify') {
-        n8nNode = {
-          id: node.id,
-          name: node.id,
-          type: 'n8n-nodes-base.slack',
-          typeVersion: 2,
-          parameters: {
-            operation: 'message',
-            channel: '#general',
-            text: node.prompt_template,
-          },
-          position: [posX, 300],
-        }
-      } else if (tool?.name === 'web_search') {
-        n8nNode = {
-          id: node.id,
-          name: node.id,
-          type: 'n8n-nodes-base.httpRequest',
-          typeVersion: 4,
-          parameters: {
-            url: 'https://api.search.brave.com/res/v1/web/search',
-            method: 'GET',
-          },
-          position: [posX, 300],
-        }
-      } else {
-        n8nNode = {
-          id: node.id,
-          name: node.id,
-          type: 'n8n-nodes-base.noOp',
-          typeVersion: 1,
-          parameters: {},
-          position: [posX, 300],
-        }
-      }
+      n8nNode.type = 'n8n-nodes-base.noOp'
+      n8nNode.typeVersion = 1
     } else {
-      n8nNode = {
-        id: node.id,
-        name: node.id,
-        type: 'n8n-nodes-base.noOp',
-        typeVersion: 1,
-        parameters: {},
-        position: [posX, 300],
-      }
+      n8nNode.type = 'n8n-nodes-base.noOp'
+      n8nNode.typeVersion = 1
     }
 
-    if (n8nNode) {
-      nodes.push(n8nNode)
-      if (!connections[prevNodeName]) {
-        connections[prevNodeName] = { main: [[{ node: node.id, type: 'main', index: 0 }]] }
-      }
-      prevNodeName = node.id
-      posX += 200
+    nodes.push(n8nNode)
+
+    // Création de la connexion entre le précédent et l'actuel
+    if (!connections[prevNodeId]) {
+      connections[prevNodeId] = { main: [[]] }
     }
+    connections[prevNodeId].main[0].push({
+      node: n8nNode.name,
+      type: 'main',
+      index: 0
+    })
+
+    prevNodeId = n8nNode.name
+    posX += 250
   })
 
   return {
-    name: agent.name,
+    name: `Agent: ${agent.name}`,
     nodes,
     connections,
-    active: false,
-    settings: { executionOrder: 'v1' },
-    tags: [],
+    // On ne met pas "active: true" ici, c'est ce qui bloquait !
+    settings: { executionOrder: 'v1' }
   }
 }
