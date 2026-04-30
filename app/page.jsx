@@ -334,7 +334,7 @@ function AgentRunner({ agent, onClose }) {
   )
 }
 
-function AgentResult({ config, onSave, onCopy }) {
+function AgentResult({ config, onSave, onCopy, onDeploy }) {
   const safety = SAFETY_COLORS[config.safety_level] || SAFETY_COLORS.medium
   const [saved,       setSaved]       = useState(false)
   const [showRunner,  setShowRunner]  = useState(false)
@@ -389,7 +389,9 @@ function AgentResult({ config, onSave, onCopy }) {
         <button onClick={onCopy} style={{ flex: 1, minWidth: 140, padding: '14px 20px', borderRadius: 14, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: 500, transition: 'all 0.2s' }}
           onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
           onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-        >📋 Copier le JSON</button><button onClick={handleDeploy} style={{
+        >📋 Copier le JSON</button>
+
+<button onClick={onDeploy} style={{
   width: '100%', padding: '14px 20px', borderRadius: 14,
   cursor: 'pointer', marginTop: 8,
   background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
@@ -398,9 +400,7 @@ function AgentResult({ config, onSave, onCopy }) {
 }}
   onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
   onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
->
-  🚀 Déployer l'agent (le rendre vivant)
-</button>
+>🚀 Déployer l'agent (le rendre vivant)</button>
         <button onClick={handleSave} style={{ flex: 2, minWidth: 200, padding: '14px 20px', borderRadius: 14, cursor: 'pointer', background: saved ? 'linear-gradient(135deg, #059669, #0d9488)' : 'linear-gradient(135deg, #7c3aed, #db2777)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, transition: 'all 0.3s', boxShadow: saved ? '0 4px 20px rgba(5,150,105,0.4)' : '0 4px 20px rgba(124,58,237,0.4)' }}
           onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
           onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
@@ -734,7 +734,7 @@ async function handleDeploy() {
 
             <div ref={resultRef}>
               {result && !result.error && !loading && (
-                <AgentResult config={result} onSave={handleSave} onCopy={() => { navigator.clipboard.writeText(JSON.stringify(result, null, 2)); toast.success('JSON copié !') }} />
+                <AgentResult config={result} onSave={handleSave} onCopy={() => { navigator.clipboard.writeText(JSON.stringify(result, null, 2)); toast.success('JSON copié !') }} onDeploy={handleDeploy} />
               )}
             </div>
           </div>
