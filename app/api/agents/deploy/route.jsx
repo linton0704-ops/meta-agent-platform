@@ -179,6 +179,5 @@ function convertAgentToN8n(agent) {
     nodes,
     connections,
     settings: { executionOrder: 'v1' },
-    tags: [],
   }
 }
